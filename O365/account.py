@@ -1,6 +1,6 @@
 from .connection import Connection, Protocol, MSGraphProtocol, MSOffice365Protocol
 from .utils import ME_RESOURCE
-
+from urllib import parse
 
 class Account:
 
@@ -81,7 +81,7 @@ class Account:
         :rtype: bool
         """
 
-        if self.con.auth_flow_type in ('authorization', 'public'):
+        if self.con.auth_flow_type == 'authorization':
             if scopes is not None:
                 if self.con.scopes is not None:
                     raise RuntimeError('The scopes must be set either at the Account instantiation or on the account.authenticate method.')
@@ -90,15 +90,14 @@ class Account:
                 if self.con.scopes is None:
                     raise ValueError('The scopes are not set. Define the scopes requested.')
 
-            consent_url, _ = self.con.get_authorization_url(**kwargs)
-
+            auth_code_flow = self.con.get_authorization_url(**kwargs)
             print('Visit the following url to give consent:')
-            print(consent_url)
+            print(auth_code_flow['auth_uri'])
 
             token_url = input('Paste the authenticated url here:\n')
 
             if token_url:
-                result = self.con.request_token(token_url, **kwargs)  # no need to pass state as the session is the same
+                result = self.con.request_token(auth_code_flow, token_url, **kwargs)  # no need to pass state as the session is the same
                 if result:
                     print('Authentication Flow Completed. Oauth Access Token Stored. You can now use the API.')
                 else:
@@ -108,9 +107,8 @@ class Account:
             else:
                 print('Authentication Flow aborted.')
                 return False
-
-        elif self.con.auth_flow_type == 'credentials':
-            return self.con.request_token(None, requested_scopes=scopes)
+        elif self.con.auth_flow_type in ('public', 'credentials'):
+            return self.con.request_token(None, None, requested_scopes=scopes)
         else:
             raise ValueError('Connection "auth_flow_type" must be "authorization", "public" or "credentials"')
 

@@ -4,6 +4,8 @@ import datetime as dt
 from pathlib import Path
 from abc import ABC, abstractmethod
 import os
+import atexit
+from msal import SerializableTokenCache
 
 log = logging.getLogger(__name__)
 
@@ -71,12 +73,20 @@ class BaseTokenBackend(ABC):
 
     def __init__(self):
         self._token = None
-
+        self.cache = SerializableTokenCache()
+        atexit.register(self.cleanup)
+        
     @property
     def token(self):
         """ The stored Token dict """
         return self._token
 
+    def cleanup(self):
+        #if self.cache.has_state_changed:
+            #self._token = self.cache.serialize()
+            #self.save_token()
+        pass
+        
     @token.setter
     def token(self, value):
         """ Setter to convert any token dict into Token instance """
@@ -92,7 +102,10 @@ class BaseTokenBackend(ABC):
     def get_token(self):
         """ Loads the token, stores it in the token property and returns it"""
         self.token = self.load_token()  # store the token in the 'token' property
-        return self.token
+        if self.token is not None:
+            self.cache.deserialize(self.serializer.dumps(self.token))
+
+        return self.token     
 
     @abstractmethod
     def save_token(self):
@@ -152,7 +165,6 @@ class BaseTokenBackend(ABC):
                   Connection should do nothing.
         """
         return True
-
 
 class FileSystemTokenBackend(BaseTokenBackend):
     """ A token backend based on files on the filesystem """
@@ -224,6 +236,7 @@ class FileSystemTokenBackend(BaseTokenBackend):
         :return bool: True if exists, False otherwise
         """
         return self.token_path.exists()
+
 
 
 class FirestoreBackend(BaseTokenBackend):
